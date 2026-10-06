@@ -221,3 +221,6 @@ __marimo__/
 
 # Dados da Olist (baixar do Kaggle)
 data/raw/*.csv
+
+# Banco vetorial persistido localmente (recriado a partir dos dados brutos)
+data/vectorstore/

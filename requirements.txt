@@ -1,4 +1,7 @@
-  pandas
-  numpy
-  sentence-transformers
-  jupyter
+pandas
+numpy
+sentence-transformers
+jupyter
+kagglehub
+chromadb
+python-dotenv
