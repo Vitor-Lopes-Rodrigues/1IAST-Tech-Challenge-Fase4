@@ -6,3 +6,4 @@ jupyter
 kagglehub
 chromadb
 python-dotenv
+shutil

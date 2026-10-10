@@ -6,6 +6,7 @@ junto da busca vetorial, além de persistência em disco sem servidor externo
 (ver skill `olist-vectorstore`).
 """
 
+import shutil
 from pathlib import Path
 
 import chromadb
@@ -70,14 +71,13 @@ def indexar_reviews(df: pd.DataFrame, recriar: bool = False) -> int:
     `df` deve conter as colunas produzidas por `src/data/preprocess.py`
     (review_id, review_comment_message + metadados).
     """
+    if recriar and PERSIST_DIR.exists():
+        # No Windows, `delete_collection` às vezes não libera os arquivos do
+        # segmento HNSW no disco (fica pasta UUID órfã a cada reindexação).
+        # Apagar a pasta inteira antes de reabrir o client evita esse lixo.
+        shutil.rmtree(PERSIST_DIR)
+
     cliente = _obter_cliente()
-
-    if recriar:
-        try:
-            cliente.delete_collection(COLLECTION_NAME)
-        except Exception:
-            pass  # coleção pode não existir ainda
-
     colecao = cliente.get_or_create_collection(
         name=COLLECTION_NAME,
         metadata={"hnsw:space": "cosine"},
