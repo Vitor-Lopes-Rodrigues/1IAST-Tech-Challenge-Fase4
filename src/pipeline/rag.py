@@ -27,9 +27,9 @@ MODELO_LLM = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 # Calibrado empiricamente (17/10): perguntas dentro do escopo ficaram entre
 # 0,71 e 0,99; perguntas fora do escopo ("capital da França", "preço do dólar")
 # ficaram entre 0,50 e 0,56. O mínimo fica no meio dessa faixa.
-SIMILARIDADE_MINIMA = 0.62
+SIMILARIDADE_MINIMA = 0.57
 
-K_PADRAO = 20
+K_PADRAO = 30
 
 MENSAGEM_SEM_EVIDENCIA = (
     "Não encontrei avaliações de clientes suficientes na base da Olist "
@@ -48,7 +48,10 @@ PROMPT = ChatPromptTemplate.from_messages(
             "no formato [review_id].\n"
             "3. Se as avaliações não forem suficientes para responder, diga "
             "exatamente: \"" + MENSAGEM_SEM_EVIDENCIA + "\"\n"
-            "4. Responda em português, de forma objetiva, em tópicos quando fizer sentido.",
+            "4. Responda em português, de forma objetiva, em tópicos quando fizer sentido.\n"
+            "5. Cada avaliação indica quantos clientes escreveram o mesmo texto. Use essa "
+            "contagem para ordenar os tópicos do mais frequente para o menos frequente e "
+            "informe quantos clientes mencionaram cada problema.",
         ),
         (
             "human",
@@ -71,6 +74,21 @@ def filtrar_relevantes(resultados: pd.DataFrame, minimo: float = SIMILARIDADE_MI
     """Mantém só as reviews com similaridade igual ou acima do mínimo."""
     return resultados[resultados["similaridade"] >= minimo]
 
+def agrupar_repetidas(reviews: pd.DataFrame) -> pd.DataFrame:
+    """Agrupa reviews com o mesmo texto (ignorando maiúsculas e pontuação).
+
+    Mantém a primeira de cada grupo e adiciona a coluna `ocorrencias`,
+    com quantos clientes escreveram aquele mesmo texto.
+    """
+    chave = (
+        reviews["review_comment_message"]
+        .str.lower()
+        .str.replace(r"[^\w\s]", "", regex=True)
+        .str.strip()
+    )
+    agrupadas = reviews.assign(_chave=chave)
+    agrupadas["ocorrencias"] = agrupadas.groupby("_chave")["_chave"].transform("size")
+    return agrupadas.drop_duplicates("_chave").drop(columns="_chave")
 
 def formatar_contexto(reviews: pd.DataFrame) -> str:
     """Transforma as reviews em texto para o prompt, uma por linha, com metadados."""
@@ -78,15 +96,16 @@ def formatar_contexto(reviews: pd.DataFrame) -> str:
     for _, review in reviews.iterrows():
         linhas.append(
             f"[{review['review_id']}] (nota {review['review_score']}, "
-            f"categoria {review['product_category_name_english']}): "
+            f"categoria {review['product_category_name_english']}, "
+            f"{review['ocorrencias']} cliente(s) escreveram o mesmo): "
             f"{review['review_comment_message']}"
         )
     return "\n".join(linhas)
 
 
 def extrair_evidencias(reviews: pd.DataFrame) -> list[dict]:
-    """Lista estruturada das evidências: review_id, nota, similaridade e trecho."""
-    colunas = ["review_id", "review_score", "similaridade", "review_comment_message"]
+    """Lista estruturada das evidências: review_id, nota, similaridade, ocorrências e trecho."""
+    colunas = ["review_id", "review_score", "similaridade", "ocorrencias", "review_comment_message"]
     return reviews[colunas].to_dict(orient="records")
 
 
@@ -99,6 +118,7 @@ def responder(pergunta: str, k: int = K_PADRAO, filtros: dict | None = None) -> 
     if relevantes.empty:
         return RespostaRAG(resposta=MENSAGEM_SEM_EVIDENCIA)
 
+    relevantes = agrupar_repetidas(relevantes)
     evidencias = extrair_evidencias(relevantes)
 
     try:
@@ -109,7 +129,8 @@ def responder(pergunta: str, k: int = K_PADRAO, filtros: dict | None = None) -> 
         )
     except Exception as erro:
         return RespostaRAG(
-            resposta=f"Não foi possível consultar o modelo de linguagem agora: {erro}",            evidencias=evidencias,
+            resposta=f"Não foi possível consultar o modelo de linguagem agora: {erro}",
+            evidencias=evidencias,
             tem_evidencia=True,
         )
 
@@ -125,7 +146,8 @@ def imprimir(resultado: RespostaRAG) -> None:
         for ev in resultado.evidencias:
             print(
                 f"- [{ev['review_id']}] nota {ev['review_score']} | "
-                f"similaridade {ev['similaridade']:.2f} | {ev['review_comment_message']}"
+                f"similaridade {ev['similaridade']:.2f} | "
+                f"{ev['ocorrencias']}x | {ev['review_comment_message']}"
             )
 
 
