@@ -108,6 +108,24 @@ def extrair_evidencias(reviews: pd.DataFrame) -> list[dict]:
     colunas = ["review_id", "review_score", "similaridade", "ocorrencias", "review_comment_message"]
     return reviews[colunas].to_dict(orient="records")
 
+def montar_filtros(nota_maxima: int | None = None, categoria: str | None = None) -> dict | None:
+    """Monta o filtro de metadados no formato `where` do ChromaDB.
+
+    Exemplos:
+        montar_filtros(nota_maxima=2) -> {"review_score": {"$lte": 2}}
+        montar_filtros(categoria="furniture_decor") -> {"product_category_name_english": "furniture_decor"}
+    """
+    condicoes = []
+    if nota_maxima is not None:
+        condicoes.append({"review_score": {"$lte": nota_maxima}})
+    if categoria:
+        condicoes.append({"product_category_name_english": categoria})
+
+    if not condicoes:
+        return None
+    if len(condicoes) == 1:
+        return condicoes[0]
+    return {"$and": condicoes}
 
 def responder(pergunta: str, k: int = K_PADRAO, filtros: dict | None = None) -> RespostaRAG:
     """Executa o pipeline RAG completo para uma pergunta."""
@@ -153,4 +171,11 @@ def imprimir(resultado: RespostaRAG) -> None:
 
 if __name__ == "__main__":
     pergunta = input("Pergunta: ")
-    imprimir(responder(pergunta))
+    nota = input("Nota máxima (1 a 5, Enter para todas): ").strip()
+    categoria = input("Categoria em inglês (Enter para todas): ").strip()
+
+    filtros = montar_filtros(
+        nota_maxima=int(nota) if nota else None,
+        categoria=categoria or None,
+    )
+    imprimir(responder(pergunta, filtros=filtros))
