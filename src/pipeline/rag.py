@@ -22,7 +22,7 @@ from src.vectorstore.chroma_store import buscar_similares
 # Carrega o GOOGLE_API_KEY (e opcionalmente GEMINI_MODEL) do arquivo .env
 load_dotenv()
 
-MODELO_LLM = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+MODELO_LLM = os.getenv("GEMINI_MODEL", "gemini-3.7-flash")
 
 # Calibrado empiricamente (17/10): perguntas dentro do escopo ficaram entre
 # 0,71 e 0,99; perguntas fora do escopo ("capital da França", "preço do dólar")
