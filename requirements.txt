@@ -6,4 +6,5 @@ jupyter
 kagglehub
 chromadb
 python-dotenv
-shutil
+langchain-core
+langchain-google-genai
