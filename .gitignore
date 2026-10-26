@@ -224,3 +224,6 @@ data/raw/*.csv
 
 # Banco vetorial persistido localmente (recriado a partir dos dados brutos)
 data/vectorstore/
+
+# Cache da avaliação do RAG (resultados por pergunta, para retomar depois)
+docs/avaliacao_cache.json

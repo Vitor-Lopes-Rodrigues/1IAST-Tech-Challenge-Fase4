@@ -24,6 +24,10 @@ load_dotenv()
 
 MODELO_LLM = os.getenv("GEMINI_MODEL", "gemini-3.7-flash")
 
+# Quantas vezes a biblioteca tenta de novo quando o Gemini falha (ex.: 503).
+# Cada tentativa conta na cota diária do nível gratuito, então mantemos baixo.
+MAX_TENTATIVAS_LLM = int(os.getenv("GEMINI_MAX_RETRIES", "1"))
+
 # Calibrado empiricamente (17/10): perguntas dentro do escopo ficaram entre
 # 0,71 e 0,99; perguntas fora do escopo ("capital da França", "preço do dólar")
 # ficaram entre 0,50 e 0,56. O mínimo fica no meio dessa faixa.
@@ -140,7 +144,9 @@ def responder(pergunta: str, k: int = K_PADRAO, filtros: dict | None = None) -> 
     evidencias = extrair_evidencias(relevantes)
 
     try:
-        llm = ChatGoogleGenerativeAI(model=MODELO_LLM, temperature=0)
+        llm = ChatGoogleGenerativeAI(
+            model=MODELO_LLM, temperature=0, max_retries=MAX_TENTATIVAS_LLM
+        )
         cadeia = PROMPT | llm | StrOutputParser()
         texto = cadeia.invoke(
             {"contexto": formatar_contexto(relevantes), "pergunta": pergunta}
@@ -178,4 +184,4 @@ if __name__ == "__main__":
         nota_maxima=int(nota) if nota else None,
         categoria=categoria or None,
     )
-    imprimir(responder(pergunta, filtros=filtros))
+    imprimir(responder(pergunta, filtros=filtros))
